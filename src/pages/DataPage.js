@@ -4,6 +4,12 @@ import DivProgress from './DivProgress'
 import { request } from '../service/address/utils'
 import { address } from '../service/address/address'
 
+import { execute } from 'apollo-link'
+import { WebSocketLink } from 'apollo-link-ws'
+import { SubscriptionClient } from 'subscriptions-transport-ws'
+import ws from 'ws'
+import gql from 'graphql-tag'
+
 export default class DataPage extends Component {
   constructor(props) {
     super(props)
@@ -13,7 +19,46 @@ export default class DataPage extends Component {
     }
   }
 
-  componentDidMount(){
+  socketData = () => {
+    // 设置客户端
+    const getWsClient = function (wsurl) {
+      const client = new SubscriptionClient(
+        wsurl, { reconnect: true }, WebSocket
+      );
+      console.log('client', client)
+      return client;
+    };
+
+    const createSubscriptionObservable = (wsurl, query, variables) => {
+      const link = new WebSocketLink(getWsClient(wsurl));
+      return execute(link, { query: query, variables: variables });
+    };
+
+    // 使用推送
+    const SUBSCRIBE_QUERY = gql`
+    subscription {
+      survey (where: {id: {_eq: 1 }}) {
+        id
+      }
+    }
+    `;
+    const subscriptionClient = createSubscriptionObservable(
+      'ws://111.231.221.197:10004/v1/graphql', // GraphQL endpoint
+      SUBSCRIBE_QUERY,                                       // Subscription query
+      // { id: 1 }                                                // Query variables
+    );
+
+    subscriptionClient.subscribe(eventData => {
+      // Do something on receipt of the event
+      console.log("Received event: ")
+      console.log(eventData)
+    }, (err) => {
+      console.log('Err');
+      console.log(err);
+    })
+  }
+
+  componentDidMount() {
     let body = {
       "query": `
       query{
@@ -30,7 +75,7 @@ export default class DataPage extends Component {
     let config = {
       url: address.serviceDomain,
       body: JSON.stringify(body),
-      token:'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiMTg3MzIzMjUwNjQiLCJodHRwczovL2hhc3VyYS5pby9qd3QvY2xhaW1zIjp7IngtaGFzdXJhLWFsbG93ZWQtcm9sZXMiOlsidXNlciIsInVzZXIiXSwieC1oYXN1cmEtZGVmYXVsdC1yb2xlIjoidXNlciIsIngtaGFzdXJhLXVzZXItaWQiOiI0MGJhZGQwZC04Nzg5LTRkM2YtYTAxZS1jOTllZWVmMmM0ZGMifSwiaWF0IjoxNTg4ODQzODQ1LCJleHAiOjE1OTE0MzU4NDUsInN1YiI6IjQwYmFkZDBkLTg3ODktNGQzZi1hMDFlLWM5OWVlZWYyYzRkYyJ9.T6aWY1_FyVuFeufkHM71Ze44tNKRWoX37ph-BlofMTQnRBSflqmzxa0j1n9-gMJCWAFqnla9ZVA-ovrocwYXap5j5_LpVRzKcFsEN6ak-kPuVCdU6riMpx8VCZ66rY9HFDsuCNfoO1jK9adlNZjLOTUFP0raeq29AbVpzzlANJQLiWI4cRBHtwSkg7b31KeS35Ieo6-nG2sZmGJXeP5GkSYkvSTMJ3nDZx7J9-s-ezwfFvKWl0dSweK2TWfMfaqt8mHzejMls3xrfI1eCLyO7olIe2jhYXtQerxIFm812yF7huWXK6VBOdHbXNDDfVySXuC-NQ9pTtkwuMbHNpeHIA'
+      token: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiMTg3MzIzMjUwNjQiLCJodHRwczovL2hhc3VyYS5pby9qd3QvY2xhaW1zIjp7IngtaGFzdXJhLWFsbG93ZWQtcm9sZXMiOlsidXNlciIsInVzZXIiXSwieC1oYXN1cmEtZGVmYXVsdC1yb2xlIjoidXNlciIsIngtaGFzdXJhLXVzZXItaWQiOiI0MGJhZGQwZC04Nzg5LTRkM2YtYTAxZS1jOTllZWVmMmM0ZGMifSwiaWF0IjoxNTg4ODQzODQ1LCJleHAiOjE1OTE0MzU4NDUsInN1YiI6IjQwYmFkZDBkLTg3ODktNGQzZi1hMDFlLWM5OWVlZWYyYzRkYyJ9.T6aWY1_FyVuFeufkHM71Ze44tNKRWoX37ph-BlofMTQnRBSflqmzxa0j1n9-gMJCWAFqnla9ZVA-ovrocwYXap5j5_LpVRzKcFsEN6ak-kPuVCdU6riMpx8VCZ66rY9HFDsuCNfoO1jK9adlNZjLOTUFP0raeq29AbVpzzlANJQLiWI4cRBHtwSkg7b31KeS35Ieo6-nG2sZmGJXeP5GkSYkvSTMJ3nDZx7J9-s-ezwfFvKWl0dSweK2TWfMfaqt8mHzejMls3xrfI1eCLyO7olIe2jhYXtQerxIFm812yF7huWXK6VBOdHbXNDDfVySXuC-NQ9pTtkwuMbHNpeHIA'
     }
     request(config)
       .then((response) => {
@@ -59,6 +104,8 @@ export default class DataPage extends Component {
       }).catch((error) => {
         console.log('ERROR', error)
       })
+
+    this.socketData()
   }
 
   render() {
@@ -84,7 +131,7 @@ export default class DataPage extends Component {
                     width: 280,
                     height: 21,
                     marginTop: 20,
-                    fontSize:14,
+                    fontSize: 14,
                   }}>
                   <DivProgress
                     title={value}
