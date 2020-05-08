@@ -1,4 +1,7 @@
 import { address } from './address'
+import { execute } from 'apollo-link'
+import { WebSocketLink } from 'apollo-link-ws'
+import { SubscriptionClient } from 'subscriptions-transport-ws'
 function request(config) {
   config = Object.assign({}, {
     url: '',
@@ -97,7 +100,7 @@ function setNewPassword(newPasswordInfo, returnFun, errFun, errMessage) {
     returnFun(res)
   }).catch(err => {
     console.log(err)
-    if(err.response){
+    if (err.response) {
       if (err.response.status === 400) {
         return err.response.json()
       }
@@ -106,6 +109,39 @@ function setNewPassword(newPasswordInfo, returnFun, errFun, errMessage) {
   }).then(res => {
     errMessage(res)
   })
+}
+function socketData(wsUrl, SUBSCRIBE_QUERY, token) {
+  let fun = new Promise((resolve) => {
+    const client = new SubscriptionClient(
+      wsUrl,
+      {
+        reconnect: true,
+        connectionParams: {
+          headers: {
+            Accept: 'application/json',
+            ContentType: 'application/json;charset=UTF-8',
+            authorization: `Bearer ${token}`,
+          }
+        }
+      }, WebSocket
+    )
+    const link = new WebSocketLink(client)
+    // 使用推送
+    const subscriptionClient = execute(
+      link,
+      {
+        query: SUBSCRIBE_QUERY,
+      })
+
+    subscriptionClient.subscribe(response => {
+      resolve(response)
+    }, (err) => {
+      if (err.message === 'cannot start as connection_init failed with : Could not verify JWT: JWTExpired') {
+        resolve('token过期')
+      }
+    })
+  })
+  return fun
 }
 
 
@@ -116,4 +152,5 @@ export {
   email,
   register,
   setNewPassword,
+  socketData,
 }
